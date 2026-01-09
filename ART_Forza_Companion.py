@@ -836,17 +836,17 @@ def processPacket():
 				addSound('compass', preYaw)
 			print_Speak(speakingCompass, curDir)
 	curSpeed = speedConvert(unpacked_data[61])
-	if curSpeed != preSpeed and abs(curSpeed-preSpeed) >= speedSense:
-		preSpeed=curSpeed
-		if curSpeed > preSpeed:
-			curSpeedInt = curSpeedInt+1
-			if speedMon == True:
-				addSound('speed')
-		else:
-			curSpeedInt = curSpeedInt-1
-			if speedMon == True:
-				addSound('speed')
-		if speedInterval == 0 or curSpeedInt % speedInterval == 0:
+	diff = curSpeed - preSpeed
+	if abs(diff) >= speedSense:
+		old_speed = preSpeed
+		preSpeed = curSpeed
+		if curSpeed > old_speed:
+			curSpeedInt = curSpeedInt + 1
+		elif curSpeed < old_speed:
+			curSpeedInt = curSpeedInt - 1
+		if speedMon == True:
+			addSound('speed')
+		if speedInterval == 0 or (speedInterval > 0 and curSpeedInt % speedInterval == 0):
 			print_Speak(speakingSpeed, tr("tts.speed_value", speed=int(curSpeed), unit=metricString))
 
 def shutDown():
