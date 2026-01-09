@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
 	def __init__(self):
 		super().__init__()
 
-		self.setWindowTitle("Accessible Real Time Forza Companion")
+		self.setWindowTitle(tr("ui.app_title"))
 		self.setGeometry(100, 100, 600, 500)
 
 		self.tab_widget = QTabWidget()
@@ -273,17 +273,18 @@ class MainWindow(QMainWindow):
 		layout = QVBoxLayout()
 
 		for label in button_states.keys():
-			button = QPushButton(label)
+			button = QPushButton(tr(label))
 			button.clicked.connect(lambda checked, label=label: self.toggle_button(label))
 			layout.addWidget(button)
 
 		global_combo_audio_compass = QComboBox()
-		global_combo_audio_compass.addItems(audio_compass_options)
+		global_combo_audio_compass.addItems([tr(k) for k in audio_compass_options])
+		global_combo_audio_compass.setCurrentIndex(audio_compass_selection)
 		global_combo_audio_compass.currentIndexChanged.connect(self.audio_compass_changed)
 		layout.addWidget(global_combo_audio_compass)
 
 		panel.setLayout(layout)
-		self.tab_widget.addTab(panel, "Audio & Toggles")
+		self.tab_widget.addTab(panel, tr("ui.tab.audio_toggles"))
 
 	def toggle_button(self, label):
 		global button_states
@@ -314,21 +315,24 @@ class MainWindow(QMainWindow):
 		global value_variables
 		for label_text in value_variables.keys():
 			hbox = QVBoxLayout()
-			lbl = QLabel(label_text)
+			lbl = QLabel(tr(label_text))
 			edit = QLineEdit()
-			edit.setAccessibleName(label_text)
+			edit.setAccessibleName(tr(label_text))
 			edit.setValidator(QIntValidator(0, 10000))
+			current_value = value_variables.get(label_text)
+			if isinstance(current_value, int):
+				edit.setText(str(current_value))
 			hbox.addWidget(lbl)
 			hbox.addWidget(edit)
 			value_variables[label_text] = edit
 			layout.addLayout(hbox)
 
-		submit_button = QPushButton("Submit")
+		submit_button = QPushButton(tr("ui.button.submit"))
 		submit_button.clicked.connect(self.submit_values)
 		layout.addWidget(submit_button)
 
 		panel.setLayout(layout)
-		self.tab_widget.addTab(panel, "Sensitivity Settings")
+		self.tab_widget.addTab(panel, tr("ui.tab.sensitivity"))
 
 	def submit_values(self):
 		global value_variables
