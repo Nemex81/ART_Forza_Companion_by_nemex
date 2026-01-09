@@ -16,6 +16,8 @@ pygame.mixer.init()
 # i18n helpers
 translations = {}
 current_language = None
+language_preference = None
+SUPPORTED_LANGUAGES = {"en", "it"}
 
 def detect_system_language():
 	default_locale = locale.getdefaultlocale()
@@ -27,7 +29,7 @@ def detect_system_language():
 def load_translations(lang=None):
 	global translations
 	global current_language
-	base_lang = lang or detect_system_language()
+	base_lang = lang if lang in SUPPORTED_LANGUAGES else detect_system_language()
 	current_language = base_lang
 	current_directory = os.getcwd()
 	fallback_path = os.path.join(current_directory, "localization", "en.json")
@@ -84,6 +86,8 @@ AUDIO_COMPASS_OPTION_KEYS = [
 	"option.audio_compass.clicks",
 	"option.audio_compass.both"
 ]
+
+LANGUAGE_OPTIONS = [("en", "option.language.en"), ("it", "option.language.it")]
 
 OLD_TOGGLE_KEY_MAP = {
 	"Speed Audio Toggle": "toggle.audio.speed",
@@ -189,7 +193,7 @@ def default_configuration_values():
 	}
 
 configuration_values = default_configuration_values()
-def save_configuration(dict1, dict2, int_value):
+def save_configuration(dict1, dict2, int_value, language=None):
 	current_directory = os.getcwd()
 	file_path = os.path.join(current_directory, "config.json")
 
@@ -198,6 +202,8 @@ def save_configuration(dict1, dict2, int_value):
 		"dict2": dict2,
 		"int_value": int_value
 	}
+	if language in SUPPORTED_LANGUAGES:
+		config_data["language"] = language
 
 	with open(file_path, 'w') as config_file:
 		json.dump(config_data, config_file)
@@ -218,6 +224,7 @@ def load_configuration():
 	toggle_defaults = {key: False for key in TOGGLE_KEYS}
 	setting_defaults = default_configuration_values()
 	audio_compass_value = 0
+	language_pref = None
 
 	try:
 		with open(file_path, 'r') as config_file:
@@ -225,6 +232,9 @@ def load_configuration():
 			dict1 = config_data.get("dict1", {})
 			dict2 = config_data.get("dict2", {})
 			int_value = config_data.get("int_value", 0)
+			language_value = config_data.get("language")
+			if isinstance(language_value, str) and language_value.lower() in SUPPORTED_LANGUAGES:
+				language_pref = language_value.lower()
 
 			for key, value in dict1.items():
 				new_key = OLD_TOGGLE_KEY_MAP.get(key, key)
@@ -240,9 +250,9 @@ def load_configuration():
 				audio_compass_value = int(int_value)
 			except (TypeError, ValueError):
 				audio_compass_value = 0
-			return toggle_defaults, setting_defaults, audio_compass_value
+			return toggle_defaults, setting_defaults, audio_compass_value, language_pref
 	except FileNotFoundError:
-		return toggle_defaults, setting_defaults, audio_compass_value  # Return default values if the file doesn't exist
+		return toggle_defaults, setting_defaults, audio_compass_value, language_pref  # Return default values if the file doesn't exist
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QPushButton, QComboBox, QLineEdit, QLabel
 from PyQt5.QtGui import QIntValidator
@@ -272,6 +282,17 @@ class MainWindow(QMainWindow):
 		panel = QWidget()
 		layout = QVBoxLayout()
 
+		lang_label = QLabel(tr("ui.language"))
+		self.language_combo = QComboBox()
+		for code, key in LANGUAGE_OPTIONS:
+			self.language_combo.addItem(tr(key), code)
+		current_lang_index = self.language_combo.findData(language_preference)
+		if current_lang_index >= 0:
+			self.language_combo.setCurrentIndex(current_lang_index)
+		self.language_combo.currentIndexChanged.connect(self.language_changed)
+		layout.addWidget(lang_label)
+		layout.addWidget(self.language_combo)
+
 		for label in button_states.keys():
 			button = QPushButton(tr(label))
 			button.clicked.connect(lambda checked, label=label: self.toggle_button(label))
@@ -297,7 +318,7 @@ class MainWindow(QMainWindow):
 			button_states[label] = not button_states[label]
 			speak(tr("tts.benchmark_canceled"))
 		if label == "action.config.save":
-			save_configuration(button_states, configuration_values, audio_compass_selection)
+			save_configuration(button_states, configuration_values, audio_compass_selection, language_preference)
 
 		if label != "toggle.benchmark" and label != "action.config.save":
 			button_states[label] = not button_states[label]
@@ -307,6 +328,15 @@ class MainWindow(QMainWindow):
 		global audio_compass_selection
 		audio_compass_selection = index
 		speak(tr("tts.compass_mode_changed", mode=tr(audio_compass_options[index])))
+
+	def language_changed(self, index):
+		global language_preference
+		selected_lang = self.language_combo.itemData(index)
+		if selected_lang not in SUPPORTED_LANGUAGES:
+			return
+		language_preference = selected_lang
+		save_configuration(button_states, configuration_values, audio_compass_selection, language_preference)
+		speak(tr("tts.restart_required"))
 
 	def add_edit_panel(self):
 		panel = QWidget()
@@ -842,7 +872,9 @@ def shutDown():
 
 mainThread = threading.Thread(target=mainStart)
 packetThread = threading.Thread(target=packetReceiver)
-button_states, value_variables, audio_compass_selection = load_configuration()
+button_states, value_variables, audio_compass_selection, language_preference = load_configuration()
+language_preference = language_preference if language_preference in SUPPORTED_LANGUAGES else detect_system_language()
+load_translations(language_preference)
 configuration_values = value_variables.copy()
 speedInterval = configuration_values.get("setting.speed.interval", speedInterval)
 speedSense = configuration_values.get("setting.speed.sensitivity", speedSense)

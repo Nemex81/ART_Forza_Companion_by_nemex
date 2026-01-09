@@ -3,7 +3,10 @@
   "ui.tab.audio_toggles": "Audio & Toggles",
   "ui.tab.sensitivity": "Sensitivity Settings",
   "ui.button.submit": "Submit",
+  "ui.language": "Language",
 
+  "option.language.en": "English",
+  "option.language.it": "Italiano",
   "toggle.audio.speed": "Speed audio",
   "toggle.audio.elevation": "Elevation audio",
   "toggle.audio.suspension": "Suspension audio",
@@ -42,6 +45,7 @@
   "tts.compass_mode_changed": "Audio compass mode changed to {mode}.",
   "tts.benchmark_completed": "{speed} {unit} bench mark completed in {time} seconds.",
   "tts.speed_value": "{speed} {unit}",
+  "tts.restart_required": "Language saved. Restart required to apply changes.",
 
   "tts.gear": "Gear {gear}",
   "tts.reverse": "Reverse",
