@@ -11,20 +11,131 @@ import concurrent.futures
 import time
 import json
 import os
+import locale
 pygame.mixer.init()
-#Variables
+# i18n helpers
+translations = {}
+current_language = None
+language_preference = None
+SUPPORTED_LANGUAGES = {"en", "it"}
+
+def detect_system_language():
+	default_locale = locale.getdefaultlocale()
+	lang_code = default_locale[0] if default_locale and default_locale[0] else ""
+	if isinstance(lang_code, str) and lang_code.lower().startswith("it"):
+		return "it"
+	return "en"
+
+def load_translations(lang=None):
+	global translations
+	global current_language
+	base_lang = lang if lang in SUPPORTED_LANGUAGES else detect_system_language()
+	current_language = base_lang
+	current_directory = os.getcwd()
+	fallback_path = os.path.join(current_directory, "localization", "en.json")
+	lang_path = os.path.join(current_directory, "localization", f"{base_lang}.json")
+	try:
+		with open(fallback_path, 'r', encoding="utf-8") as f:
+			translations = json.load(f)
+	except FileNotFoundError:
+		translations = {}
+	if base_lang != "en":
+		try:
+			with open(lang_path, 'r', encoding="utf-8") as f:
+				translations.update(json.load(f))
+		except FileNotFoundError:
+			pass
+
+def tr(key, **kwargs):
+	value = translations.get(key, key)
+	try:
+		return str(value).format(**kwargs)
+	except Exception:
+		return value
+
+load_translations()
+TOGGLE_KEYS = [
+	"toggle.audio.speed",
+	"toggle.audio.elevation",
+	"toggle.audio.suspension",
+	"toggle.audio.tire_temp",
+	"toggle.sr.speed",
+	"toggle.sr.elevation",
+	"toggle.sr.compass",
+	"toggle.sr.suspension",
+	"toggle.sr.tire_temps",
+	"toggle.sr.gears",
+	"toggle.measurement.metric",
+	"toggle.benchmark",
+	"action.config.save"
+]
+
+SETTING_KEYS = [
+	"setting.speed.interval",
+	"setting.speed.sensitivity",
+	"setting.compass.sensitivity",
+	"setting.elevation.sensitivity",
+	"setting.tire_temp.front_max",
+	"setting.tire_temp.rear_max",
+	"setting.benchmark.target_speed"
+]
+
+AUDIO_COMPASS_OPTION_KEYS = [
+	"option.audio_compass.off",
+	"option.audio_compass.cardinals",
+	"option.audio_compass.clicks",
+	"option.audio_compass.both"
+]
+
+LANGUAGE_OPTIONS = [("en", "option.language.en"), ("it", "option.language.it")]
+
+OLD_TOGGLE_KEY_MAP = {
+	"Speed Audio Toggle": "toggle.audio.speed",
+	"Elevation Audio Toggle": "toggle.audio.elevation",
+	"Suspension Audio Toggle": "toggle.audio.suspension",
+	"Tire Temp Audio Toggle": "toggle.audio.tire_temp",
+	"SR Speed Toggle": "toggle.sr.speed",
+	"SR Elevation Toggle": "toggle.sr.elevation",
+	"SR Compass Toggle": "toggle.sr.compass",
+	"SR Suspension Toggle": "toggle.sr.suspension",
+	"SR Tire Temps Toggle": "toggle.sr.tire_temps",
+	"SR Gears Toggle": "toggle.sr.gears",
+	"Measurement Toggle": "toggle.measurement.metric",
+	"Benchmark Toggle": "toggle.benchmark",
+	"Save Configuration": "action.config.save"
+}
+
+OLD_SETTING_KEY_MAP = {
+	"Speed Interval": "setting.speed.interval",
+	"Speed Sensitivity": "setting.speed.sensitivity",
+	"Compass Sensitivity": "setting.compass.sensitivity",
+	"Elevation Sensitivity": "setting.elevation.sensitivity",
+	"Front Tire Temp": "setting.tire_temp.front_max",
+	"Rear Tire Temp": "setting.tire_temp.rear_max",
+	"Benchmark Speed": "setting.benchmark.target_speed"
+}
+
+# Variables
+DEFAULT_SPEED_INTERVAL = 5
+DEFAULT_SPEED_SENSITIVITY = 10
+DEFAULT_COMPASS_SENSITIVITY = 10
+DEFAULT_ELEVATION_SENSITIVITY = 3
+DEFAULT_FRONT_TIRE_TEMP = 200
+DEFAULT_REAR_TIRE_TEMP = 200
+DEFAULT_BENCHMARK_SPEED = 60
+
 bmMonitor=False
 prePitch= 0
 preRoll = 0
 armedBenchmark=False
 startBenchmark = False
-bmSpeed = 60
+bmSpeed = DEFAULT_BENCHMARK_SPEED
 bmStartTime= 0
 bmEndTime = 0
-speedInterval = 5
+speedInterval = DEFAULT_SPEED_INTERVAL
 curSpeedInt = 0
 preSpeed = 0
-speedSense= 10
+speedSense= DEFAULT_SPEED_SENSITIVITY
 packeting = True
 sound_events = {}
 packed_data = []
@@ -33,8 +144,8 @@ bottomedFL = False
 bottomedFR = False
 bottomedRL = False
 bottomedRR = False
-maxTF = 200
-maxTR = 200
+maxTF = DEFAULT_FRONT_TIRE_TEMP
+maxTR = DEFAULT_REAR_TIRE_TEMP
 frontMax = False
 rearMax = False
 preTTFL=0
@@ -67,19 +178,22 @@ preDir=""
 preClick=0.0
 exceed=0
 preElevation=0
-elevationSense=3
-compassSense=10
-configuration_values = {
-	"Speed Interval": speedInterval,
-	"Speed Sensitivity": speedSense,
-	"Compass Sensitivity": compassSense,
-	"Elevation Sensitivity": elevationSense,
-	"Front Tire Temp": maxTF,
-	"Rear Tire Temp": maxTR,
-	"Benchmark Speed": bmSpeed
-}
-# Function to save configuration to a file
-def save_configuration(dict1, dict2, int_value):
+elevationSense=DEFAULT_ELEVATION_SENSITIVITY
+compassSense=DEFAULT_COMPASS_SENSITIVITY
+
+def default_configuration_values():
+	return {
+		"setting.speed.interval": DEFAULT_SPEED_INTERVAL,
+		"setting.speed.sensitivity": DEFAULT_SPEED_SENSITIVITY,
+		"setting.compass.sensitivity": DEFAULT_COMPASS_SENSITIVITY,
+		"setting.elevation.sensitivity": DEFAULT_ELEVATION_SENSITIVITY,
+		"setting.tire_temp.front_max": DEFAULT_FRONT_TIRE_TEMP,
+		"setting.tire_temp.rear_max": DEFAULT_REAR_TIRE_TEMP,
+		"setting.benchmark.target_speed": DEFAULT_BENCHMARK_SPEED
+	}
+
+configuration_values = default_configuration_values()
+def save_configuration(dict1, dict2, int_value, language=None):
 	current_directory = os.getcwd()
 	file_path = os.path.join(current_directory, "config.json")
 
@@ -88,15 +202,29 @@ def save_configuration(dict1, dict2, int_value):
 		"dict2": dict2,
 		"int_value": int_value
 	}
+	if language in SUPPORTED_LANGUAGES:
+		config_data["language"] = language
 
 	with open(file_path, 'w') as config_file:
 		json.dump(config_data, config_file)
-	speak("Configuration saved.")
+	speak(tr("tts.config_saved"))
+
+def _normalize_setting_value(key, value):
+	defaults = default_configuration_values()
+	try:
+		return int(value)
+	except (ValueError, TypeError):
+		return defaults.get(key, value)
 
 # Function to read and update configuration from a file
 def load_configuration():
 	current_directory = os.getcwd()
 	file_path = os.path.join(current_directory, "config.json")
+
+	toggle_defaults = {key: False for key in TOGGLE_KEYS}
+	setting_defaults = default_configuration_values()
+	audio_compass_value = 0
+	language_pref = None
 
 	try:
 		with open(file_path, 'r') as config_file:
@@ -104,52 +232,44 @@ def load_configuration():
 			dict1 = config_data.get("dict1", {})
 			dict2 = config_data.get("dict2", {})
 			int_value = config_data.get("int_value", 0)
-			return dict1, dict2, int_value
+			language_value = config_data.get("language")
+			if isinstance(language_value, str) and language_value.lower() in SUPPORTED_LANGUAGES:
+				language_pref = language_value.lower()
+
+			for key, value in dict1.items():
+				new_key = OLD_TOGGLE_KEY_MAP.get(key, key)
+				if new_key in toggle_defaults:
+					toggle_defaults[new_key] = bool(value)
+
+			for key, value in dict2.items():
+				new_key = OLD_SETTING_KEY_MAP.get(key, key)
+				if new_key in setting_defaults:
+					setting_defaults[new_key] = _normalize_setting_value(new_key, value)
+
+			try:
+				audio_compass_value = int(int_value)
+			except (TypeError, ValueError):
+				audio_compass_value = 0
+			return toggle_defaults, setting_defaults, audio_compass_value, language_pref
 	except FileNotFoundError:
-		return  {label: False for label in [
-	"Speed Audio Toggle", "Elevation Audio Toggle", "Suspension Audio Toggle",
-	"Tire Temp Audio Toggle", "SR Speed Toggle", "SR Elevation Toggle",
-	"SR Compass Toggle", "SR Suspension Toggle", "SR Tire Temps Toggle",
-	"SR Gears Toggle", "Measurement Toggle", "Benchmark Toggle","Save Configuration"
-]}, {
-	"Speed Interval": None,
-	"Speed Sensitivity": None,
-	"Elevation Sensitivity": None,
-	"Compass Sensitivity": None,
-	"Front Tire Temp": None,
-	"Rear Tire Temp": None,
-	"Benchmark Speed": None
-}, 0  # Return default values if the file doesn't exist
+		return toggle_defaults, setting_defaults, audio_compass_value, language_pref  # Return default values if the file doesn't exist
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QPushButton, QComboBox, QLineEdit, QLabel
 from PyQt5.QtGui import QIntValidator
 
 # Define global variables
-audio_compass_options = ['off', 'Cardinal Directions', 'Clicks only', 'Cardinal and clicks']
+audio_compass_options = AUDIO_COMPASS_OPTION_KEYS
 audio_compass_selection = 0
 
-button_states = {label: False for label in [
-	"Speed Audio Toggle", "Elevation Audio Toggle", "Suspension Audio Toggle",
-	"Tire Temp Audio Toggle", "SR Speed Toggle", "SR Elevation Toggle",
-	"SR Compass Toggle", "SR Suspension Toggle", "SR Tire Temps Toggle",
-	"SR Gears Toggle", "Measurement Toggle", "Benchmark Toggle","Save Configuration"
-]}
+button_states = {label: False for label in TOGGLE_KEYS}
 
-value_variables = {
-	"Speed Interval": None,
-	"Speed Sensitivity": None,
-	"Elevation Sensitivity": None,
-	"Compass Sensitivity": None,
-	"Front Tire Temp": None,
-	"Rear Tire Temp": None,
-	"Benchmark Speed": None
-}
+value_variables = default_configuration_values()
 
 class MainWindow(QMainWindow):
 	def __init__(self):
 		super().__init__()
 
-		self.setWindowTitle("Accessible Real Time Forza Companion")
+		self.setWindowTitle(tr("ui.app_title"))
 		self.setGeometry(100, 100, 600, 500)
 
 		self.tab_widget = QTabWidget()
@@ -162,40 +282,61 @@ class MainWindow(QMainWindow):
 		panel = QWidget()
 		layout = QVBoxLayout()
 
+		lang_label = QLabel(tr("ui.language"))
+		self.language_combo = QComboBox()
+		for code, key in LANGUAGE_OPTIONS:
+			self.language_combo.addItem(tr(key), code)
+		current_lang_index = self.language_combo.findData(language_preference)
+		if current_lang_index >= 0:
+			self.language_combo.setCurrentIndex(current_lang_index)
+		self.language_combo.currentIndexChanged.connect(self.language_changed)
+		layout.addWidget(lang_label)
+		layout.addWidget(self.language_combo)
+
 		for label in button_states.keys():
-			button = QPushButton(label)
+			button = QPushButton(tr(label))
 			button.clicked.connect(lambda checked, label=label: self.toggle_button(label))
 			layout.addWidget(button)
 
 		global_combo_audio_compass = QComboBox()
-		global_combo_audio_compass.addItems(audio_compass_options)
+		global_combo_audio_compass.addItems([tr(k) for k in audio_compass_options])
+		global_combo_audio_compass.setCurrentIndex(audio_compass_selection)
 		global_combo_audio_compass.currentIndexChanged.connect(self.audio_compass_changed)
 		layout.addWidget(global_combo_audio_compass)
 
 		panel.setLayout(layout)
-		self.tab_widget.addTab(panel, "Audio & Toggles")
+		self.tab_widget.addTab(panel, tr("ui.tab.audio_toggles"))
 
 	def toggle_button(self, label):
 		global button_states
 		global configuration_values
 		global audio_compass_selection
-		if label == "Benchmark Toggle" and button_states[label] == False:
+		if label == "toggle.benchmark" and button_states[label] == False:
 			button_states[label] = not button_states[label]
-			speak("Bench mark in progress. Please reduce speed to 0 and engine RPM to idle")
-		elif label == "Benchmark Toggle" and button_states[label] == True:
+			speak(tr("tts.benchmark_start"))
+		elif label == "toggle.benchmark" and button_states[label] == True:
 			button_states[label] = not button_states[label]
-			speak("Benchmark canceled.")
-		if label == "Save Configuration":
-			save_configuration(button_states, configuration_values, audio_compass_selection)
+			speak(tr("tts.benchmark_canceled"))
+		if label == "action.config.save":
+			save_configuration(button_states, configuration_values, audio_compass_selection, language_preference)
 
-		if label != "Benchmark Toggle" and label != "Save Configuration":
+		if label != "toggle.benchmark" and label != "action.config.save":
 			button_states[label] = not button_states[label]
-			speak(f"{label} toggled to {button_states[label]}")
+			speak(tr("tts.toggle_generic", label=tr(label), state=button_states[label]))
 
 	def audio_compass_changed(self, index):
 		global audio_compass_selection
 		audio_compass_selection = index
-		speak(f"Audio compass option changed to {audio_compass_options[index]} ({index})")
+		speak(tr("tts.compass_mode_changed", mode=tr(audio_compass_options[index])))
+
+	def language_changed(self, index):
+		global language_preference
+		selected_lang = self.language_combo.itemData(index)
+		if selected_lang not in SUPPORTED_LANGUAGES:
+			return
+		language_preference = selected_lang
+		save_configuration(button_states, configuration_values, audio_compass_selection, language_preference)
+		speak(tr("tts.restart_required"))
 
 	def add_edit_panel(self):
 		panel = QWidget()
@@ -204,21 +345,24 @@ class MainWindow(QMainWindow):
 		global value_variables
 		for label_text in value_variables.keys():
 			hbox = QVBoxLayout()
-			lbl = QLabel(label_text)
+			lbl = QLabel(tr(label_text))
 			edit = QLineEdit()
-			edit.setAccessibleName(label_text)
+			edit.setAccessibleName(tr(label_text))
 			edit.setValidator(QIntValidator(0, 10000))
+			current_value = value_variables.get(label_text)
+			if isinstance(current_value, int):
+				edit.setText(str(current_value))
 			hbox.addWidget(lbl)
 			hbox.addWidget(edit)
 			value_variables[label_text] = edit
 			layout.addLayout(hbox)
 
-		submit_button = QPushButton("Submit")
+		submit_button = QPushButton(tr("ui.button.submit"))
 		submit_button.clicked.connect(self.submit_values)
 		layout.addWidget(submit_button)
 
 		panel.setLayout(layout)
-		self.tab_widget.addTab(panel, "Sensitivity Settings")
+		self.tab_widget.addTab(panel, tr("ui.tab.sensitivity"))
 
 	def submit_values(self):
 		global value_variables
@@ -232,9 +376,9 @@ class MainWindow(QMainWindow):
 				all_values_valid = False
 
 		if not all_values_valid:
-			speak("Please enter valid integer values in all fields.")
+			speak(tr("tts.invalid_integers"))
 		else:
-			speak("All values set.")
+			speak(tr("tts.all_values_set"))
 def mainStart():
 	if __name__ == '__main__':
 		app = QApplication([])
@@ -264,37 +408,39 @@ def updateVars():
 	global elevationSensor
 	global suspAudio
 	global tempAudio
+	global metricString
 	global button_states
 	global value_variables
 	global audio_compass_selection
-	if isinstance(value_variables["Speed Interval"], int):
-		speedInterval=value_variables["Speed Interval"]
-		configuration_values["Speed Interval"] = speedInterval
-	if isinstance(value_variables["Speed Sensitivity"], int):
-		speedSense=value_variables["Speed Sensitivity"]
-		configuration_values["Speed Sensitivity"] = speedSense
-	if isinstance(value_variables["Elevation Sensitivity"], int):
-		elevationSense=value_variables["Elevation Sensitivity"]
-		configuration_values["Elevation Sensitivity"] = elevationSense
-	if isinstance(value_variables["Compass Sensitivity"], int):
-		compassSense=value_variables["Compass Sensitivity"]
-		configuration_values["Compass Sensitivity"] = compassSense
-	if isinstance(value_variables["Front Tire Temp"], int):
-		maxTF=value_variables["Front Tire Temp"]
-		configuration_values["Front Tire Temp"] = maxTF
-	if isinstance(value_variables["Rear Tire Temp"], int):
-		maxTR=value_variables["Rear Tire Temp"]
-		configuration_value["Rear Tire Temp"] = maxTR
-	if isinstance(value_variables["Benchmark Speed"], int):
-		bmSpeed=value_variables["Benchmark Speed"]
-		configuration_values["Benchmark Speed"] = bmSpeed
-	metric=button_states["Measurement Toggle"]
-	speakingTemp=button_states["SR Tire Temps Toggle"]
-	speakingSusp=button_states["SR Suspension Toggle"]
-	speakingGear=button_states["SR Gears Toggle"]
-	speakingCompass=button_states["SR Compass Toggle"]
-	speakingElevation=button_states["SR Elevation Toggle"]
-	speakingSpeed=button_states["SR Speed Toggle"]
+	if isinstance(value_variables["setting.speed.interval"], int):
+		speedInterval=value_variables["setting.speed.interval"]
+		configuration_values["setting.speed.interval"] = speedInterval
+	if isinstance(value_variables["setting.speed.sensitivity"], int):
+		speedSense=value_variables["setting.speed.sensitivity"]
+		configuration_values["setting.speed.sensitivity"] = speedSense
+	if isinstance(value_variables["setting.elevation.sensitivity"], int):
+		elevationSense=value_variables["setting.elevation.sensitivity"]
+		configuration_values["setting.elevation.sensitivity"] = elevationSense
+	if isinstance(value_variables["setting.compass.sensitivity"], int):
+		compassSense=value_variables["setting.compass.sensitivity"]
+		configuration_values["setting.compass.sensitivity"] = compassSense
+	if isinstance(value_variables["setting.tire_temp.front_max"], int):
+		maxTF=value_variables["setting.tire_temp.front_max"]
+		configuration_values["setting.tire_temp.front_max"] = maxTF
+	if isinstance(value_variables["setting.tire_temp.rear_max"], int):
+		maxTR=value_variables["setting.tire_temp.rear_max"]
+		configuration_values["setting.tire_temp.rear_max"] = maxTR
+	if isinstance(value_variables["setting.benchmark.target_speed"], int):
+		bmSpeed=value_variables["setting.benchmark.target_speed"]
+		configuration_values["setting.benchmark.target_speed"] = bmSpeed
+	metric=button_states["toggle.measurement.metric"]
+	metricString = "KMH" if metric else "MPH"
+	speakingTemp=button_states["toggle.sr.tire_temps"]
+	speakingSusp=button_states["toggle.sr.suspension"]
+	speakingGear=button_states["toggle.sr.gears"]
+	speakingCompass=button_states["toggle.sr.compass"]
+	speakingElevation=button_states["toggle.sr.elevation"]
+	speakingSpeed=button_states["toggle.sr.speed"]
 	if audio_compass_selection == 0:
 		audioCompass = False
 		compassClicks=False
@@ -307,11 +453,11 @@ def updateVars():
 	elif audio_compass_selection == 3:
 		audioCompass=True
 		compassClicks=True
-	speedMon = button_states["Speed Audio Toggle"]
-	elevationSensor=button_states["Elevation Audio Toggle"]
-	suspAudio= button_states["Suspension Audio Toggle"]
-	tempAudio=button_states["Tire Temp Audio Toggle"]
-	bmMonitor = button_states["Benchmark Toggle"]
+	speedMon = button_states["toggle.audio.speed"]
+	elevationSensor=button_states["toggle.audio.elevation"]
+	suspAudio= button_states["toggle.audio.suspension"]
+	tempAudio=button_states["toggle.audio.tire_temp"]
+	bmMonitor = button_states["toggle.benchmark"]
 	if bmMonitor == False:
 		armedBenchmark=False
 		startBenchmark=False
@@ -483,23 +629,23 @@ def addSound(sound_name, index=None):
 #addSound("compass", index=45)  # Plays the sound at index 45 in compassSounds
 def convertDir(degrees):
 	if 337.5 <= degrees < 360 or 0 <= degrees < 22.5:
-		return "North"
+		return tr("dir.north")
 	elif 22.5 <= degrees < 67.5:
-		return "Northeast"
+		return tr("dir.northeast")
 	elif 67.5 <= degrees < 112.5:
-		return "East"
+		return tr("dir.east")
 	elif 112.5 <= degrees < 157.5:
-		return "Southeast"
+		return tr("dir.southeast")
 	elif 157.5 <= degrees < 202.5:
-		return "South"
+		return tr("dir.south")
 	elif 202.5 <= degrees < 247.5:
-		return "Southwest"
+		return tr("dir.southwest")
 	elif 247.5 <= degrees < 292.5:
-		return "West"
+		return tr("dir.west")
 	elif 292.5 <= degrees < 337.5:
-		return "Northwest"
+		return tr("dir.northwest")
 	else:
-		return "Invalid degree"
+		return tr("dir.invalid")
 def speedConvert(speed_mps):
 	if metric == False:
 		return speed_mps * 2.23694
@@ -528,12 +674,12 @@ def speedBenchMark(curRPM, idleRPM, curSpeed, curTime):
 			print("Timer started.")
 		if armedBenchmark == True and startBenchmark == True and speed >= bmSpeed:
 			bmMonitor = False
-			button_states["Benchmark Toggle"] = False
+			button_states["toggle.benchmark"] = False
 			armedBenchmark = False
 			startBenchmark = False
 			bmEndTime=curTime
 			bmTotalTime = (bmEndTime-bmStartTime)/1000
-			print_Speak(True,str(bmSpeed)+" "+metricString+" bench mark completed in "+str(bmTotalTime)+" seconds")
+			print_Speak(True,tr("tts.benchmark_completed", speed=bmSpeed, unit=metricString, time=bmTotalTime))
 # Set the server's port
 port = 5300
 
@@ -610,58 +756,58 @@ def processPacket():
 		preRoll = curRoll
 	curGear = unpacked_data[81]
 	if curGear != preGear and curGear != 11 and curGear != 0:
-		print_Speak(speakingGear,"Gear "+str(curGear))
+		print_Speak(speakingGear, tr("tts.gear", gear=curGear))
 		preGear=curGear
 	elif curGear != preGear and curGear == 0:
-		print_Speak(speakingGear, "Reverse")
+		print_Speak(speakingGear, tr("tts.reverse"))
 		preGear=curGear
 	TTFL = unpacked_data[64]
 	TTFR = unpacked_data[65]
 	TTRL = unpacked_data[66]
 	TTRR = unpacked_data[67]
 	if TTFL >= maxTF and frontMax == False or TTFR >= maxTF and frontMax == False:
-		print_Speak(speakingTemp, "Front tires have exceeded "+str(maxTF)+" degrees. Front left is "+str(TTFL)+" and front right is "+str(TTFR)+".")
+		print_Speak(speakingTemp, tr("tts.tire_front_exceeded", limit=maxTF, left=TTFL, right=TTFR))
 		frontMax = True
 		if tempAudio == True:
 			addSound('front temp')
 	if TTRL >= maxTR and rearMax == False or TTRR >= maxTR and rearMax == False:
-		print_Speak(speakingTemp, "Rear tires have exceeded "+str(maxTR)+" degrees")
+		print_Speak(speakingTemp, tr("tts.tire_rear_exceeded", limit=maxTR))
 		rearMax = True
 		if tempAudio == True:
 			addSound('rear temp')
 	if TTFL < maxTF and TTFR < maxTF and frontMax == True:
-		print_Speak(speakingTemp, "Front tires have dropped below "+str(maxTF)+" degrees to "+str(TTFL)+" front left, and "+str(TTFR)+" front right.")
+		print_Speak(speakingTemp, tr("tts.tire_front_below", limit=maxTF, left=TTFL, right=TTFR))
 		frontMax=False
 	if TTRL < maxTR and TTRR < maxTR and rearMax == True:
-		print_Speak(speakingTemp, "Rear tires have fallen below "+str(maxTR)+" degrees")
+		print_Speak(speakingTemp, tr("tts.tire_rear_below", limit=maxTR))
 		rearMax = False
 	suspFL = unpacked_data[17]
 	suspFR = unpacked_data[18]
 	suspRL = unpacked_data[19]
 	suspRR = unpacked_data[20]
 	if suspFL >= 1 and bottomedFL == False:
-		print_Speak(speakingSusp, "Front left suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.fl"))
 		bottomedFL = True
 		if suspAudio == True:
 			addSound('Suspfl')
 	if suspFL < 1 and bottomedFL == True:
 		bottomedFL = False
 	if suspFR >= 1 and bottomedFR == False:
-		print_Speak(speakingSusp, "Front right suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.fr"))
 		bottomedFR = True
 		if suspAudio == True:
 			addSound('Suspfr')
 	if suspFR < 1 and bottomedFR == True:
 		bottomedFR = False
 	if suspRL >= 1 and bottomedRL == False:
-		print_Speak(speakingSusp, "Rear left suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.rl"))
 		bottomedRL = True
 		if suspAudio == True:
 			addSound('Susprl')
 	if suspRL < 1 and bottomedRL == True:
 		bottomedRL = False
 	if suspRR >= 1 and bottomedRR == False:
-		print_Speak(speakingSusp, "Rear right suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.rr"))
 		bottomedRR = True
 		if suspAudio == True:
 			addSound('Susprr')
@@ -673,11 +819,11 @@ def processPacket():
 			if curElevation > preElevation:
 				if elevationSensor == True:
 					addSound('ascend')
-				print_Speak(speakingElevation, "Ascending")
+				print_Speak(speakingElevation, tr("tts.ascending"))
 			if curElevation < preElevation:
 				if elevationSensor == True:
 					addSound('descend')
-				print_Speak(speakingElevation, "Descending")
+				print_Speak(speakingElevation, tr("tts.descending"))
 			preElevation=curElevation
 	curYaw = int((unpacked_data[14] * (180 / math.pi)) + 180)
 	if curYaw == 360:
@@ -711,7 +857,7 @@ def processPacket():
 			if speedMon == True:
 				addSound('speed')
 		if speedInterval == 0 or curSpeedInt % speedInterval == 0:
-			print_Speak(speakingSpeed, str(int(curSpeed))+" "+metricString)
+			print_Speak(speakingSpeed, tr("tts.speed_value", speed=int(curSpeed), unit=metricString))
 
 def shutDown():
 	print("Stopping the server...")
@@ -726,7 +872,19 @@ def shutDown():
 
 mainThread = threading.Thread(target=mainStart)
 packetThread = threading.Thread(target=packetReceiver)
-button_states, value_variables, audio_compass_selection = load_configuration()
+button_states, value_variables, audio_compass_selection, language_preference = load_configuration()
+language_preference = language_preference if language_preference in SUPPORTED_LANGUAGES else detect_system_language()
+load_translations(language_preference)
+configuration_values = value_variables.copy()
+speedInterval = configuration_values.get("setting.speed.interval", speedInterval)
+speedSense = configuration_values.get("setting.speed.sensitivity", speedSense)
+elevationSense = configuration_values.get("setting.elevation.sensitivity", elevationSense)
+compassSense = configuration_values.get("setting.compass.sensitivity", compassSense)
+maxTF = configuration_values.get("setting.tire_temp.front_max", maxTF)
+maxTR = configuration_values.get("setting.tire_temp.rear_max", maxTR)
+bmSpeed = configuration_values.get("setting.benchmark.target_speed", bmSpeed)
+metric = button_states.get("toggle.measurement.metric", metric)
+metricString = "KMH" if metric else "MPH"
 try:
 	packetThread.start()
 	mainThread.start()
@@ -753,4 +911,3 @@ try:
 except KeyboardInterrupt:
 	# Close the socket when interrupted (e.g., by Ctrl+C)
 	shutDown()
-
