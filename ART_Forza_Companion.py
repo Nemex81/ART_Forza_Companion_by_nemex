@@ -52,19 +52,86 @@ def tr(key, **kwargs):
 		return value
 
 load_translations()
-#Variables
+TOGGLE_KEYS = [
+	"toggle.audio.speed",
+	"toggle.audio.elevation",
+	"toggle.audio.suspension",
+	"toggle.audio.tire_temp",
+	"toggle.sr.speed",
+	"toggle.sr.elevation",
+	"toggle.sr.compass",
+	"toggle.sr.suspension",
+	"toggle.sr.tire_temps",
+	"toggle.sr.gears",
+	"toggle.measurement.metric",
+	"toggle.benchmark",
+	"action.config.save"
+]
+
+SETTING_KEYS = [
+	"setting.speed.interval",
+	"setting.speed.sensitivity",
+	"setting.compass.sensitivity",
+	"setting.elevation.sensitivity",
+	"setting.tire_temp.front_max",
+	"setting.tire_temp.rear_max",
+	"setting.benchmark.target_speed"
+]
+
+AUDIO_COMPASS_OPTION_KEYS = [
+	"option.audio_compass.off",
+	"option.audio_compass.cardinals",
+	"option.audio_compass.clicks",
+	"option.audio_compass.both"
+]
+
+OLD_TOGGLE_KEY_MAP = {
+	"Speed Audio Toggle": "toggle.audio.speed",
+	"Elevation Audio Toggle": "toggle.audio.elevation",
+	"Suspension Audio Toggle": "toggle.audio.suspension",
+	"Tire Temp Audio Toggle": "toggle.audio.tire_temp",
+	"SR Speed Toggle": "toggle.sr.speed",
+	"SR Elevation Toggle": "toggle.sr.elevation",
+	"SR Compass Toggle": "toggle.sr.compass",
+	"SR Suspension Toggle": "toggle.sr.suspension",
+	"SR Tire Temps Toggle": "toggle.sr.tire_temps",
+	"SR Gears Toggle": "toggle.sr.gears",
+	"Measurement Toggle": "toggle.measurement.metric",
+	"Benchmark Toggle": "toggle.benchmark",
+	"Save Configuration": "action.config.save"
+}
+
+OLD_SETTING_KEY_MAP = {
+	"Speed Interval": "setting.speed.interval",
+	"Speed Sensitivity": "setting.speed.sensitivity",
+	"Compass Sensitivity": "setting.compass.sensitivity",
+	"Elevation Sensitivity": "setting.elevation.sensitivity",
+	"Front Tire Temp": "setting.tire_temp.front_max",
+	"Rear Tire Temp": "setting.tire_temp.rear_max",
+	"Benchmark Speed": "setting.benchmark.target_speed"
+}
+
+# Variables
+DEFAULT_SPEED_INTERVAL = 5
+DEFAULT_SPEED_SENSITIVITY = 10
+DEFAULT_COMPASS_SENSITIVITY = 10
+DEFAULT_ELEVATION_SENSITIVITY = 3
+DEFAULT_FRONT_TIRE_TEMP = 200
+DEFAULT_REAR_TIRE_TEMP = 200
+DEFAULT_BENCHMARK_SPEED = 60
+
 bmMonitor=False
 prePitch= 0
 preRoll = 0
 armedBenchmark=False
 startBenchmark = False
-bmSpeed = 60
+bmSpeed = DEFAULT_BENCHMARK_SPEED
 bmStartTime= 0
 bmEndTime = 0
-speedInterval = 5
+speedInterval = DEFAULT_SPEED_INTERVAL
 curSpeedInt = 0
 preSpeed = 0
-speedSense= 10
+speedSense= DEFAULT_SPEED_SENSITIVITY
 packeting = True
 sound_events = {}
 packed_data = []
@@ -73,8 +140,8 @@ bottomedFL = False
 bottomedFR = False
 bottomedRL = False
 bottomedRR = False
-maxTF = 200
-maxTR = 200
+maxTF = DEFAULT_FRONT_TIRE_TEMP
+maxTR = DEFAULT_REAR_TIRE_TEMP
 frontMax = False
 rearMax = False
 preTTFL=0
@@ -107,18 +174,21 @@ preDir=""
 preClick=0.0
 exceed=0
 preElevation=0
-elevationSense=3
-compassSense=10
-configuration_values = {
-	"Speed Interval": speedInterval,
-	"Speed Sensitivity": speedSense,
-	"Compass Sensitivity": compassSense,
-	"Elevation Sensitivity": elevationSense,
-	"Front Tire Temp": maxTF,
-	"Rear Tire Temp": maxTR,
-	"Benchmark Speed": bmSpeed
-}
-# Function to save configuration to a file
+elevationSense=DEFAULT_ELEVATION_SENSITIVITY
+compassSense=DEFAULT_COMPASS_SENSITIVITY
+
+def default_configuration_values():
+	return {
+		"setting.speed.interval": DEFAULT_SPEED_INTERVAL,
+		"setting.speed.sensitivity": DEFAULT_SPEED_SENSITIVITY,
+		"setting.compass.sensitivity": DEFAULT_COMPASS_SENSITIVITY,
+		"setting.elevation.sensitivity": DEFAULT_ELEVATION_SENSITIVITY,
+		"setting.tire_temp.front_max": DEFAULT_FRONT_TIRE_TEMP,
+		"setting.tire_temp.rear_max": DEFAULT_REAR_TIRE_TEMP,
+		"setting.benchmark.target_speed": DEFAULT_BENCHMARK_SPEED
+	}
+
+configuration_values = default_configuration_values()
 def save_configuration(dict1, dict2, int_value):
 	current_directory = os.getcwd()
 	file_path = os.path.join(current_directory, "config.json")
@@ -133,10 +203,21 @@ def save_configuration(dict1, dict2, int_value):
 		json.dump(config_data, config_file)
 	speak("Configuration saved.")
 
+def _normalize_setting_value(key, value):
+	defaults = default_configuration_values()
+	try:
+		return int(value)
+	except (ValueError, TypeError):
+		return defaults.get(key, value)
+
 # Function to read and update configuration from a file
 def load_configuration():
 	current_directory = os.getcwd()
 	file_path = os.path.join(current_directory, "config.json")
+
+	toggle_defaults = {key: False for key in TOGGLE_KEYS}
+	setting_defaults = default_configuration_values()
+	audio_compass_value = 0
 
 	try:
 		with open(file_path, 'r') as config_file:
@@ -144,46 +225,35 @@ def load_configuration():
 			dict1 = config_data.get("dict1", {})
 			dict2 = config_data.get("dict2", {})
 			int_value = config_data.get("int_value", 0)
-			return dict1, dict2, int_value
+
+			for key, value in dict1.items():
+				new_key = OLD_TOGGLE_KEY_MAP.get(key, key)
+				if new_key in toggle_defaults:
+					toggle_defaults[new_key] = bool(value)
+
+			for key, value in dict2.items():
+				new_key = OLD_SETTING_KEY_MAP.get(key, key)
+				if new_key in setting_defaults:
+					setting_defaults[new_key] = _normalize_setting_value(new_key, value)
+
+			try:
+				audio_compass_value = int(int_value)
+			except (TypeError, ValueError):
+				audio_compass_value = 0
+			return toggle_defaults, setting_defaults, audio_compass_value
 	except FileNotFoundError:
-		return  {label: False for label in [
-	"Speed Audio Toggle", "Elevation Audio Toggle", "Suspension Audio Toggle",
-	"Tire Temp Audio Toggle", "SR Speed Toggle", "SR Elevation Toggle",
-	"SR Compass Toggle", "SR Suspension Toggle", "SR Tire Temps Toggle",
-	"SR Gears Toggle", "Measurement Toggle", "Benchmark Toggle","Save Configuration"
-]}, {
-	"Speed Interval": None,
-	"Speed Sensitivity": None,
-	"Elevation Sensitivity": None,
-	"Compass Sensitivity": None,
-	"Front Tire Temp": None,
-	"Rear Tire Temp": None,
-	"Benchmark Speed": None
-}, 0  # Return default values if the file doesn't exist
+		return toggle_defaults, setting_defaults, audio_compass_value  # Return default values if the file doesn't exist
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QPushButton, QComboBox, QLineEdit, QLabel
 from PyQt5.QtGui import QIntValidator
 
 # Define global variables
-audio_compass_options = ['off', 'Cardinal Directions', 'Clicks only', 'Cardinal and clicks']
+audio_compass_options = AUDIO_COMPASS_OPTION_KEYS
 audio_compass_selection = 0
 
-button_states = {label: False for label in [
-	"Speed Audio Toggle", "Elevation Audio Toggle", "Suspension Audio Toggle",
-	"Tire Temp Audio Toggle", "SR Speed Toggle", "SR Elevation Toggle",
-	"SR Compass Toggle", "SR Suspension Toggle", "SR Tire Temps Toggle",
-	"SR Gears Toggle", "Measurement Toggle", "Benchmark Toggle","Save Configuration"
-]}
+button_states = {label: False for label in TOGGLE_KEYS}
 
-value_variables = {
-	"Speed Interval": None,
-	"Speed Sensitivity": None,
-	"Elevation Sensitivity": None,
-	"Compass Sensitivity": None,
-	"Front Tire Temp": None,
-	"Rear Tire Temp": None,
-	"Benchmark Speed": None
-}
+value_variables = default_configuration_values()
 
 class MainWindow(QMainWindow):
 	def __init__(self):
@@ -219,16 +289,16 @@ class MainWindow(QMainWindow):
 		global button_states
 		global configuration_values
 		global audio_compass_selection
-		if label == "Benchmark Toggle" and button_states[label] == False:
+		if label == "toggle.benchmark" and button_states[label] == False:
 			button_states[label] = not button_states[label]
 			speak("Bench mark in progress. Please reduce speed to 0 and engine RPM to idle")
-		elif label == "Benchmark Toggle" and button_states[label] == True:
+		elif label == "toggle.benchmark" and button_states[label] == True:
 			button_states[label] = not button_states[label]
 			speak("Benchmark canceled.")
-		if label == "Save Configuration":
+		if label == "action.config.save":
 			save_configuration(button_states, configuration_values, audio_compass_selection)
 
-		if label != "Benchmark Toggle" and label != "Save Configuration":
+		if label != "toggle.benchmark" and label != "action.config.save":
 			button_states[label] = not button_states[label]
 			speak(f"{label} toggled to {button_states[label]}")
 
@@ -307,34 +377,34 @@ def updateVars():
 	global button_states
 	global value_variables
 	global audio_compass_selection
-	if isinstance(value_variables["Speed Interval"], int):
-		speedInterval=value_variables["Speed Interval"]
-		configuration_values["Speed Interval"] = speedInterval
-	if isinstance(value_variables["Speed Sensitivity"], int):
-		speedSense=value_variables["Speed Sensitivity"]
-		configuration_values["Speed Sensitivity"] = speedSense
-	if isinstance(value_variables["Elevation Sensitivity"], int):
-		elevationSense=value_variables["Elevation Sensitivity"]
-		configuration_values["Elevation Sensitivity"] = elevationSense
-	if isinstance(value_variables["Compass Sensitivity"], int):
-		compassSense=value_variables["Compass Sensitivity"]
-		configuration_values["Compass Sensitivity"] = compassSense
-	if isinstance(value_variables["Front Tire Temp"], int):
-		maxTF=value_variables["Front Tire Temp"]
-		configuration_values["Front Tire Temp"] = maxTF
-	if isinstance(value_variables["Rear Tire Temp"], int):
-		maxTR=value_variables["Rear Tire Temp"]
-		configuration_value["Rear Tire Temp"] = maxTR
-	if isinstance(value_variables["Benchmark Speed"], int):
-		bmSpeed=value_variables["Benchmark Speed"]
-		configuration_values["Benchmark Speed"] = bmSpeed
-	metric=button_states["Measurement Toggle"]
-	speakingTemp=button_states["SR Tire Temps Toggle"]
-	speakingSusp=button_states["SR Suspension Toggle"]
-	speakingGear=button_states["SR Gears Toggle"]
-	speakingCompass=button_states["SR Compass Toggle"]
-	speakingElevation=button_states["SR Elevation Toggle"]
-	speakingSpeed=button_states["SR Speed Toggle"]
+	if isinstance(value_variables["setting.speed.interval"], int):
+		speedInterval=value_variables["setting.speed.interval"]
+		configuration_values["setting.speed.interval"] = speedInterval
+	if isinstance(value_variables["setting.speed.sensitivity"], int):
+		speedSense=value_variables["setting.speed.sensitivity"]
+		configuration_values["setting.speed.sensitivity"] = speedSense
+	if isinstance(value_variables["setting.elevation.sensitivity"], int):
+		elevationSense=value_variables["setting.elevation.sensitivity"]
+		configuration_values["setting.elevation.sensitivity"] = elevationSense
+	if isinstance(value_variables["setting.compass.sensitivity"], int):
+		compassSense=value_variables["setting.compass.sensitivity"]
+		configuration_values["setting.compass.sensitivity"] = compassSense
+	if isinstance(value_variables["setting.tire_temp.front_max"], int):
+		maxTF=value_variables["setting.tire_temp.front_max"]
+		configuration_values["setting.tire_temp.front_max"] = maxTF
+	if isinstance(value_variables["setting.tire_temp.rear_max"], int):
+		maxTR=value_variables["setting.tire_temp.rear_max"]
+		configuration_values["setting.tire_temp.rear_max"] = maxTR
+	if isinstance(value_variables["setting.benchmark.target_speed"], int):
+		bmSpeed=value_variables["setting.benchmark.target_speed"]
+		configuration_values["setting.benchmark.target_speed"] = bmSpeed
+	metric=button_states["toggle.measurement.metric"]
+	speakingTemp=button_states["toggle.sr.tire_temps"]
+	speakingSusp=button_states["toggle.sr.suspension"]
+	speakingGear=button_states["toggle.sr.gears"]
+	speakingCompass=button_states["toggle.sr.compass"]
+	speakingElevation=button_states["toggle.sr.elevation"]
+	speakingSpeed=button_states["toggle.sr.speed"]
 	if audio_compass_selection == 0:
 		audioCompass = False
 		compassClicks=False
@@ -347,11 +417,11 @@ def updateVars():
 	elif audio_compass_selection == 3:
 		audioCompass=True
 		compassClicks=True
-	speedMon = button_states["Speed Audio Toggle"]
-	elevationSensor=button_states["Elevation Audio Toggle"]
-	suspAudio= button_states["Suspension Audio Toggle"]
-	tempAudio=button_states["Tire Temp Audio Toggle"]
-	bmMonitor = button_states["Benchmark Toggle"]
+	speedMon = button_states["toggle.audio.speed"]
+	elevationSensor=button_states["toggle.audio.elevation"]
+	suspAudio= button_states["toggle.audio.suspension"]
+	tempAudio=button_states["toggle.audio.tire_temp"]
+	bmMonitor = button_states["toggle.benchmark"]
 	if bmMonitor == False:
 		armedBenchmark=False
 		startBenchmark=False
@@ -568,7 +638,7 @@ def speedBenchMark(curRPM, idleRPM, curSpeed, curTime):
 			print("Timer started.")
 		if armedBenchmark == True and startBenchmark == True and speed >= bmSpeed:
 			bmMonitor = False
-			button_states["Benchmark Toggle"] = False
+			button_states["toggle.benchmark"] = False
 			armedBenchmark = False
 			startBenchmark = False
 			bmEndTime=curTime
@@ -767,6 +837,7 @@ def shutDown():
 mainThread = threading.Thread(target=mainStart)
 packetThread = threading.Thread(target=packetReceiver)
 button_states, value_variables, audio_compass_selection = load_configuration()
+configuration_values = value_variables.copy()
 try:
 	packetThread.start()
 	mainThread.start()
