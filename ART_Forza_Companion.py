@@ -12,6 +12,7 @@ import time
 import json
 import os
 import locale
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 pygame.mixer.init()
 # i18n helpers
 translations = {}
@@ -20,7 +21,9 @@ language_preference = None
 SUPPORTED_LANGUAGES = {"en", "it"}
 
 def detect_system_language():
-	default_locale = locale.getdefaultlocale()
+	default_locale = locale.getlocale()
+	if not default_locale or not default_locale[0]:
+		default_locale = locale.getdefaultlocale()
 	lang_code = default_locale[0] if default_locale and default_locale[0] else ""
 	if isinstance(lang_code, str) and lang_code.lower().startswith("it"):
 		return "it"
@@ -31,9 +34,8 @@ def load_translations(lang=None):
 	global current_language
 	base_lang = lang if lang in SUPPORTED_LANGUAGES else detect_system_language()
 	current_language = base_lang
-	current_directory = os.getcwd()
-	fallback_path = os.path.join(current_directory, "localization", "en.json")
-	lang_path = os.path.join(current_directory, "localization", f"{base_lang}.json")
+	fallback_path = os.path.join(BASE_DIR, "localization", "en.json")
+	lang_path = os.path.join(BASE_DIR, "localization", f"{base_lang}.json")
 	try:
 		with open(fallback_path, 'r', encoding="utf-8") as f:
 			translations = json.load(f)
@@ -195,8 +197,7 @@ def default_configuration_values():
 configuration_values = default_configuration_values()
 setting_edits = {}
 def save_configuration(dict1, dict2, int_value, language=None):
-	current_directory = os.getcwd()
-	file_path = os.path.join(current_directory, "config.json")
+	file_path = os.path.join(BASE_DIR, "config.json")
 
 	config_data = {
 		"dict1": dict1,
@@ -219,8 +220,7 @@ def _normalize_setting_value(key, value):
 
 # Function to read and update configuration from a file
 def load_configuration():
-	current_directory = os.getcwd()
-	file_path = os.path.join(current_directory, "config.json")
+	file_path = os.path.join(BASE_DIR, "config.json")
 
 	toggle_defaults = {key: False for key in TOGGLE_KEYS}
 	setting_defaults = default_configuration_values()
@@ -251,6 +251,7 @@ def load_configuration():
 				audio_compass_value = int(int_value)
 			except (TypeError, ValueError):
 				audio_compass_value = 0
+			audio_compass_value = max(0, min(audio_compass_value, len(AUDIO_COMPASS_OPTION_KEYS)-1))
 			return toggle_defaults, setting_defaults, audio_compass_value, language_pref
 	except FileNotFoundError:
 		return toggle_defaults, setting_defaults, audio_compass_value, language_pref  # Return default values if the file doesn't exist
