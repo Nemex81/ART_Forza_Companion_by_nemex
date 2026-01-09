@@ -378,6 +378,7 @@ def updateVars():
 	global elevationSensor
 	global suspAudio
 	global tempAudio
+	global metricString
 	global button_states
 	global value_variables
 	global audio_compass_selection
@@ -403,6 +404,7 @@ def updateVars():
 		bmSpeed=value_variables["setting.benchmark.target_speed"]
 		configuration_values["setting.benchmark.target_speed"] = bmSpeed
 	metric=button_states["toggle.measurement.metric"]
+	metricString = "KMH" if metric else "MPH"
 	speakingTemp=button_states["toggle.sr.tire_temps"]
 	speakingSusp=button_states["toggle.sr.suspension"]
 	speakingGear=button_states["toggle.sr.gears"]
@@ -842,6 +844,15 @@ mainThread = threading.Thread(target=mainStart)
 packetThread = threading.Thread(target=packetReceiver)
 button_states, value_variables, audio_compass_selection = load_configuration()
 configuration_values = value_variables.copy()
+speedInterval = configuration_values.get("setting.speed.interval", speedInterval)
+speedSense = configuration_values.get("setting.speed.sensitivity", speedSense)
+elevationSense = configuration_values.get("setting.elevation.sensitivity", elevationSense)
+compassSense = configuration_values.get("setting.compass.sensitivity", compassSense)
+maxTF = configuration_values.get("setting.tire_temp.front_max", maxTF)
+maxTR = configuration_values.get("setting.tire_temp.rear_max", maxTR)
+bmSpeed = configuration_values.get("setting.benchmark.target_speed", bmSpeed)
+metric = button_states.get("toggle.measurement.metric", metric)
+metricString = "KMH" if metric else "MPH"
 try:
 	packetThread.start()
 	mainThread.start()
