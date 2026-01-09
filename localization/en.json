@@ -1,0 +1,71 @@
+{
+  "app.title": "Accessible Real Time Forza Companion",
+
+  "tab.audio_toggles": "Audio & Toggles",
+  "tab.sensitivity": "Sensitivity Settings",
+
+  "button.submit": "Submit",
+
+  "toggle.speed_audio": "Speed Audio Toggle",
+  "toggle.elevation_audio": "Elevation Audio Toggle",
+  "toggle.suspension_audio": "Suspension Audio Toggle",
+  "toggle.tiretemp_audio": "Tire Temp Audio Toggle",
+
+  "toggle.sr_speed": "SR Speed Toggle",
+  "toggle.sr_elevation": "SR Elevation Toggle",
+  "toggle.sr_compass": "SR Compass Toggle",
+  "toggle.sr_suspension": "SR Suspension Toggle",
+  "toggle.sr_tiretemps": "SR Tire Temps Toggle",
+  "toggle.sr_gears": "SR Gears Toggle",
+
+  "toggle.measurement": "Measurement Toggle",
+  "toggle.benchmark": "Benchmark Toggle",
+  "action.save_config": "Save Configuration",
+
+  "combo.audio_compass.off": "off",
+  "combo.audio_compass.cardinals": "Cardinal Directions",
+  "combo.audio_compass.clicks": "Clicks only",
+  "combo.audio_compass.both": "Cardinal and clicks",
+
+  "field.speed_interval": "Speed Interval",
+  "field.speed_sensitivity": "Speed Sensitivity",
+  "field.compass_sensitivity": "Compass Sensitivity",
+  "field.elevation_sensitivity": "Elevation Sensitivity",
+  "field.front_tire_temp": "Front Tire Temp",
+  "field.rear_tire_temp": "Rear Tire Temp",
+  "field.benchmark_speed": "Benchmark Speed",
+
+  "tts.config_saved": "Configuration saved.",
+  "tts.toggle_generic": "{label} toggled to {state}",
+
+  "tts.benchmark_start": "Bench mark in progress. Please reduce speed to 0 and engine RPM to idle",
+  "tts.benchmark_canceled": "Benchmark canceled.",
+  "tts.all_values_set": "All values set.",
+  "tts.invalid_integers": "Please enter valid integer values in all fields.",
+
+  "tts.gear": "Gear {gear}",
+  "tts.reverse": "Reverse",
+
+  "tts.tire_front_exceeded": "Front tires have exceeded {limit} degrees. Front left is {left} and front right is {right}.",
+  "tts.tire_rear_exceeded": "Rear tires have exceeded {limit} degrees",
+  "tts.tire_front_below": "Front tires have dropped below {limit} degrees to {left} front left, and {right} front right.",
+  "tts.tire_rear_below": "Rear tires have fallen below {limit} degrees",
+
+  "tts.susp_fl": "Front left suspension bottomed out",
+  "tts.susp_fr": "Front right suspension bottomed out",
+  "tts.susp_rl": "Rear left suspension bottomed out",
+  "tts.susp_rr": "Rear right suspension bottomed out",
+
+  "tts.ascending": "Ascending",
+  "tts.descending": "Descending",
+
+  "dir.north": "North",
+  "dir.northeast": "Northeast",
+  "dir.east": "East",
+  "dir.southeast": "Southeast",
+  "dir.south": "South",
+  "dir.southwest": "Southwest",
+  "dir.west": "West",
+  "dir.northwest": "Northwest",
+  "dir.invalid": "Invalid degree"
+}
