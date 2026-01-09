@@ -11,7 +11,47 @@ import concurrent.futures
 import time
 import json
 import os
+import locale
 pygame.mixer.init()
+# i18n helpers
+translations = {}
+current_language = None
+
+def detect_system_language():
+	default_locale = locale.getdefaultlocale()
+	lang_code = default_locale[0] if default_locale and default_locale[0] else ""
+	if isinstance(lang_code, str) and lang_code.lower().startswith("it"):
+		return "it"
+	return "en"
+
+def load_translations(lang=None):
+	global translations
+	global current_language
+	base_lang = lang or detect_system_language()
+	current_language = base_lang
+	current_directory = os.getcwd()
+	fallback_path = os.path.join(current_directory, "localization", "en.json")
+	lang_path = os.path.join(current_directory, "localization", f"{base_lang}.json")
+	try:
+		with open(fallback_path, 'r', encoding="utf-8") as f:
+			translations = json.load(f)
+	except FileNotFoundError:
+		translations = {}
+	if base_lang != "en":
+		try:
+			with open(lang_path, 'r', encoding="utf-8") as f:
+				translations.update(json.load(f))
+		except FileNotFoundError:
+			pass
+
+def tr(key, **kwargs):
+	value = translations.get(key, key)
+	try:
+		return str(value).format(**kwargs)
+	except Exception:
+		return value
+
+load_translations()
 #Variables
 bmMonitor=False
 prePitch= 0
@@ -753,4 +793,3 @@ try:
 except KeyboardInterrupt:
 	# Close the socket when interrupted (e.g., by Ctrl+C)
 	shutDown()
-
