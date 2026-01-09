@@ -201,7 +201,7 @@ def save_configuration(dict1, dict2, int_value):
 
 	with open(file_path, 'w') as config_file:
 		json.dump(config_data, config_file)
-	speak("Configuration saved.")
+	speak(tr("tts.config_saved"))
 
 def _normalize_setting_value(key, value):
 	defaults = default_configuration_values()
@@ -292,21 +292,21 @@ class MainWindow(QMainWindow):
 		global audio_compass_selection
 		if label == "toggle.benchmark" and button_states[label] == False:
 			button_states[label] = not button_states[label]
-			speak("Bench mark in progress. Please reduce speed to 0 and engine RPM to idle")
+			speak(tr("tts.benchmark_start"))
 		elif label == "toggle.benchmark" and button_states[label] == True:
 			button_states[label] = not button_states[label]
-			speak("Benchmark canceled.")
+			speak(tr("tts.benchmark_canceled"))
 		if label == "action.config.save":
 			save_configuration(button_states, configuration_values, audio_compass_selection)
 
 		if label != "toggle.benchmark" and label != "action.config.save":
 			button_states[label] = not button_states[label]
-			speak(f"{label} toggled to {button_states[label]}")
+			speak(tr("tts.toggle_generic", label=tr(label), state=button_states[label]))
 
 	def audio_compass_changed(self, index):
 		global audio_compass_selection
 		audio_compass_selection = index
-		speak(f"Audio compass option changed to {audio_compass_options[index]} ({index})")
+		speak(tr("tts.compass_mode_changed", mode=tr(audio_compass_options[index])))
 
 	def add_edit_panel(self):
 		panel = QWidget()
@@ -346,9 +346,9 @@ class MainWindow(QMainWindow):
 				all_values_valid = False
 
 		if not all_values_valid:
-			speak("Please enter valid integer values in all fields.")
+			speak(tr("tts.invalid_integers"))
 		else:
-			speak("All values set.")
+			speak(tr("tts.all_values_set"))
 def mainStart():
 	if __name__ == '__main__':
 		app = QApplication([])
@@ -597,23 +597,23 @@ def addSound(sound_name, index=None):
 #addSound("compass", index=45)  # Plays the sound at index 45 in compassSounds
 def convertDir(degrees):
 	if 337.5 <= degrees < 360 or 0 <= degrees < 22.5:
-		return "North"
+		return tr("dir.north")
 	elif 22.5 <= degrees < 67.5:
-		return "Northeast"
+		return tr("dir.northeast")
 	elif 67.5 <= degrees < 112.5:
-		return "East"
+		return tr("dir.east")
 	elif 112.5 <= degrees < 157.5:
-		return "Southeast"
+		return tr("dir.southeast")
 	elif 157.5 <= degrees < 202.5:
-		return "South"
+		return tr("dir.south")
 	elif 202.5 <= degrees < 247.5:
-		return "Southwest"
+		return tr("dir.southwest")
 	elif 247.5 <= degrees < 292.5:
-		return "West"
+		return tr("dir.west")
 	elif 292.5 <= degrees < 337.5:
-		return "Northwest"
+		return tr("dir.northwest")
 	else:
-		return "Invalid degree"
+		return tr("dir.invalid")
 def speedConvert(speed_mps):
 	if metric == False:
 		return speed_mps * 2.23694
@@ -647,7 +647,7 @@ def speedBenchMark(curRPM, idleRPM, curSpeed, curTime):
 			startBenchmark = False
 			bmEndTime=curTime
 			bmTotalTime = (bmEndTime-bmStartTime)/1000
-			print_Speak(True,str(bmSpeed)+" "+metricString+" bench mark completed in "+str(bmTotalTime)+" seconds")
+			print_Speak(True,tr("tts.benchmark_completed", speed=bmSpeed, unit=metricString, time=bmTotalTime))
 # Set the server's port
 port = 5300
 
@@ -724,58 +724,58 @@ def processPacket():
 		preRoll = curRoll
 	curGear = unpacked_data[81]
 	if curGear != preGear and curGear != 11 and curGear != 0:
-		print_Speak(speakingGear,"Gear "+str(curGear))
+		print_Speak(speakingGear, tr("tts.gear", gear=curGear))
 		preGear=curGear
 	elif curGear != preGear and curGear == 0:
-		print_Speak(speakingGear, "Reverse")
+		print_Speak(speakingGear, tr("tts.reverse"))
 		preGear=curGear
 	TTFL = unpacked_data[64]
 	TTFR = unpacked_data[65]
 	TTRL = unpacked_data[66]
 	TTRR = unpacked_data[67]
 	if TTFL >= maxTF and frontMax == False or TTFR >= maxTF and frontMax == False:
-		print_Speak(speakingTemp, "Front tires have exceeded "+str(maxTF)+" degrees. Front left is "+str(TTFL)+" and front right is "+str(TTFR)+".")
+		print_Speak(speakingTemp, tr("tts.tire_front_exceeded", limit=maxTF, left=TTFL, right=TTFR))
 		frontMax = True
 		if tempAudio == True:
 			addSound('front temp')
 	if TTRL >= maxTR and rearMax == False or TTRR >= maxTR and rearMax == False:
-		print_Speak(speakingTemp, "Rear tires have exceeded "+str(maxTR)+" degrees")
+		print_Speak(speakingTemp, tr("tts.tire_rear_exceeded", limit=maxTR))
 		rearMax = True
 		if tempAudio == True:
 			addSound('rear temp')
 	if TTFL < maxTF and TTFR < maxTF and frontMax == True:
-		print_Speak(speakingTemp, "Front tires have dropped below "+str(maxTF)+" degrees to "+str(TTFL)+" front left, and "+str(TTFR)+" front right.")
+		print_Speak(speakingTemp, tr("tts.tire_front_below", limit=maxTF, left=TTFL, right=TTFR))
 		frontMax=False
 	if TTRL < maxTR and TTRR < maxTR and rearMax == True:
-		print_Speak(speakingTemp, "Rear tires have fallen below "+str(maxTR)+" degrees")
+		print_Speak(speakingTemp, tr("tts.tire_rear_below", limit=maxTR))
 		rearMax = False
 	suspFL = unpacked_data[17]
 	suspFR = unpacked_data[18]
 	suspRL = unpacked_data[19]
 	suspRR = unpacked_data[20]
 	if suspFL >= 1 and bottomedFL == False:
-		print_Speak(speakingSusp, "Front left suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.fl"))
 		bottomedFL = True
 		if suspAudio == True:
 			addSound('Suspfl')
 	if suspFL < 1 and bottomedFL == True:
 		bottomedFL = False
 	if suspFR >= 1 and bottomedFR == False:
-		print_Speak(speakingSusp, "Front right suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.fr"))
 		bottomedFR = True
 		if suspAudio == True:
 			addSound('Suspfr')
 	if suspFR < 1 and bottomedFR == True:
 		bottomedFR = False
 	if suspRL >= 1 and bottomedRL == False:
-		print_Speak(speakingSusp, "Rear left suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.rl"))
 		bottomedRL = True
 		if suspAudio == True:
 			addSound('Susprl')
 	if suspRL < 1 and bottomedRL == True:
 		bottomedRL = False
 	if suspRR >= 1 and bottomedRR == False:
-		print_Speak(speakingSusp, "Rear right suspension bottomed out")
+		print_Speak(speakingSusp, tr("tts.susp.rr"))
 		bottomedRR = True
 		if suspAudio == True:
 			addSound('Susprr')
@@ -787,11 +787,11 @@ def processPacket():
 			if curElevation > preElevation:
 				if elevationSensor == True:
 					addSound('ascend')
-				print_Speak(speakingElevation, "Ascending")
+				print_Speak(speakingElevation, tr("tts.ascending"))
 			if curElevation < preElevation:
 				if elevationSensor == True:
 					addSound('descend')
-				print_Speak(speakingElevation, "Descending")
+				print_Speak(speakingElevation, tr("tts.descending"))
 			preElevation=curElevation
 	curYaw = int((unpacked_data[14] * (180 / math.pi)) + 180)
 	if curYaw == 360:
@@ -825,7 +825,7 @@ def processPacket():
 			if speedMon == True:
 				addSound('speed')
 		if speedInterval == 0 or curSpeedInt % speedInterval == 0:
-			print_Speak(speakingSpeed, str(int(curSpeed))+" "+metricString)
+			print_Speak(speakingSpeed, tr("tts.speed_value", speed=int(curSpeed), unit=metricString))
 
 def shutDown():
 	print("Stopping the server...")

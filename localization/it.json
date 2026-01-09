@@ -40,6 +40,8 @@
   "tts.all_values_set": "Impostazioni applicate.",
   "tts.invalid_integers": "Inserisci valori interi validi in tutti i campi.",
   "tts.compass_mode_changed": "Modalità bussola audio: {mode}.",
+  "tts.benchmark_completed": "{speed} {unit} completato in {time} secondi.",
+  "tts.speed_value": "{speed} {unit}",
 
   "tts.gear": "Marcia {gear}",
   "tts.reverse": "Retromarcia",

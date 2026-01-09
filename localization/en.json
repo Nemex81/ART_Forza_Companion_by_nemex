@@ -40,6 +40,8 @@
   "tts.all_values_set": "All values set.",
   "tts.invalid_integers": "Please enter valid integer values in all fields.",
   "tts.compass_mode_changed": "Audio compass mode changed to {mode}.",
+  "tts.benchmark_completed": "{speed} {unit} bench mark completed in {time} seconds.",
+  "tts.speed_value": "{speed} {unit}",
 
   "tts.gear": "Gear {gear}",
   "tts.reverse": "Reverse",
