@@ -12,6 +12,7 @@ import time
 import json
 import os
 import locale
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 pygame.mixer.init()
 # i18n helpers
 translations = {}
@@ -20,7 +21,9 @@ language_preference = None
 SUPPORTED_LANGUAGES = {"en", "it"}
 
 def detect_system_language():
-	default_locale = locale.getdefaultlocale()
+	default_locale = locale.getlocale()
+	if not default_locale or not default_locale[0]:
+		default_locale = locale.getdefaultlocale()
 	lang_code = default_locale[0] if default_locale and default_locale[0] else ""
 	if isinstance(lang_code, str) and lang_code.lower().startswith("it"):
 		return "it"
@@ -31,9 +34,8 @@ def load_translations(lang=None):
 	global current_language
 	base_lang = lang if lang in SUPPORTED_LANGUAGES else detect_system_language()
 	current_language = base_lang
-	current_directory = os.getcwd()
-	fallback_path = os.path.join(current_directory, "localization", "en.json")
-	lang_path = os.path.join(current_directory, "localization", f"{base_lang}.json")
+	fallback_path = os.path.join(BASE_DIR, "localization", "en.json")
+	lang_path = os.path.join(BASE_DIR, "localization", f"{base_lang}.json")
 	try:
 		with open(fallback_path, 'r', encoding="utf-8") as f:
 			translations = json.load(f)
@@ -193,9 +195,9 @@ def default_configuration_values():
 	}
 
 configuration_values = default_configuration_values()
+setting_edits = {}
 def save_configuration(dict1, dict2, int_value, language=None):
-	current_directory = os.getcwd()
-	file_path = os.path.join(current_directory, "config.json")
+	file_path = os.path.join(BASE_DIR, "config.json")
 
 	config_data = {
 		"dict1": dict1,
@@ -218,8 +220,7 @@ def _normalize_setting_value(key, value):
 
 # Function to read and update configuration from a file
 def load_configuration():
-	current_directory = os.getcwd()
-	file_path = os.path.join(current_directory, "config.json")
+	file_path = os.path.join(BASE_DIR, "config.json")
 
 	toggle_defaults = {key: False for key in TOGGLE_KEYS}
 	setting_defaults = default_configuration_values()
@@ -250,6 +251,7 @@ def load_configuration():
 				audio_compass_value = int(int_value)
 			except (TypeError, ValueError):
 				audio_compass_value = 0
+			audio_compass_value = max(0, min(audio_compass_value, len(AUDIO_COMPASS_OPTION_KEYS)-1))
 			return toggle_defaults, setting_defaults, audio_compass_value, language_pref
 	except FileNotFoundError:
 		return toggle_defaults, setting_defaults, audio_compass_value, language_pref  # Return default values if the file doesn't exist
@@ -262,8 +264,6 @@ audio_compass_options = AUDIO_COMPASS_OPTION_KEYS
 audio_compass_selection = 0
 
 button_states = {label: False for label in TOGGLE_KEYS}
-
-value_variables = default_configuration_values()
 
 class MainWindow(QMainWindow):
 	def __init__(self):
@@ -342,19 +342,20 @@ class MainWindow(QMainWindow):
 		panel = QWidget()
 		layout = QVBoxLayout()
 
-		global value_variables
-		for label_text in value_variables.keys():
+		global configuration_values
+		global setting_edits
+		defaults = default_configuration_values()
+		for label_text in SETTING_KEYS:
 			hbox = QVBoxLayout()
 			lbl = QLabel(tr(label_text))
 			edit = QLineEdit()
 			edit.setAccessibleName(tr(label_text))
 			edit.setValidator(QIntValidator(0, 10000))
-			current_value = value_variables.get(label_text)
-			if isinstance(current_value, int):
-				edit.setText(str(current_value))
+			current_value = configuration_values.get(label_text, defaults[label_text])
+			edit.setText(str(current_value))
 			hbox.addWidget(lbl)
 			hbox.addWidget(edit)
-			value_variables[label_text] = edit
+			setting_edits[label_text] = edit
 			layout.addLayout(hbox)
 
 		submit_button = QPushButton(tr("ui.button.submit"))
@@ -365,13 +366,17 @@ class MainWindow(QMainWindow):
 		self.tab_widget.addTab(panel, tr("ui.tab.sensitivity"))
 
 	def submit_values(self):
-		global value_variables
+		global configuration_values
+		global setting_edits
 		all_values_valid = True
 
-		for label, edit in value_variables.items():
+		for label in SETTING_KEYS:
+			edit = setting_edits.get(label)
+			if edit is None:
+				continue
 			text = edit.text().strip()
 			if text and text.isdigit():
-				value_variables[label] = int(text)
+				configuration_values[label] = int(text)
 			elif text:
 				all_values_valid = False
 
@@ -410,29 +415,15 @@ def updateVars():
 	global tempAudio
 	global metricString
 	global button_states
-	global value_variables
 	global audio_compass_selection
-	if isinstance(value_variables["setting.speed.interval"], int):
-		speedInterval=value_variables["setting.speed.interval"]
-		configuration_values["setting.speed.interval"] = speedInterval
-	if isinstance(value_variables["setting.speed.sensitivity"], int):
-		speedSense=value_variables["setting.speed.sensitivity"]
-		configuration_values["setting.speed.sensitivity"] = speedSense
-	if isinstance(value_variables["setting.elevation.sensitivity"], int):
-		elevationSense=value_variables["setting.elevation.sensitivity"]
-		configuration_values["setting.elevation.sensitivity"] = elevationSense
-	if isinstance(value_variables["setting.compass.sensitivity"], int):
-		compassSense=value_variables["setting.compass.sensitivity"]
-		configuration_values["setting.compass.sensitivity"] = compassSense
-	if isinstance(value_variables["setting.tire_temp.front_max"], int):
-		maxTF=value_variables["setting.tire_temp.front_max"]
-		configuration_values["setting.tire_temp.front_max"] = maxTF
-	if isinstance(value_variables["setting.tire_temp.rear_max"], int):
-		maxTR=value_variables["setting.tire_temp.rear_max"]
-		configuration_values["setting.tire_temp.rear_max"] = maxTR
-	if isinstance(value_variables["setting.benchmark.target_speed"], int):
-		bmSpeed=value_variables["setting.benchmark.target_speed"]
-		configuration_values["setting.benchmark.target_speed"] = bmSpeed
+	defaults = default_configuration_values()
+	speedInterval = configuration_values.get("setting.speed.interval", defaults["setting.speed.interval"])
+	speedSense = configuration_values.get("setting.speed.sensitivity", defaults["setting.speed.sensitivity"])
+	elevationSense = configuration_values.get("setting.elevation.sensitivity", defaults["setting.elevation.sensitivity"])
+	compassSense = configuration_values.get("setting.compass.sensitivity", defaults["setting.compass.sensitivity"])
+	maxTF = configuration_values.get("setting.tire_temp.front_max", defaults["setting.tire_temp.front_max"])
+	maxTR = configuration_values.get("setting.tire_temp.rear_max", defaults["setting.tire_temp.rear_max"])
+	bmSpeed = configuration_values.get("setting.benchmark.target_speed", defaults["setting.benchmark.target_speed"])
 	metric=button_states["toggle.measurement.metric"]
 	metricString = "KMH" if metric else "MPH"
 	speakingTemp=button_states["toggle.sr.tire_temps"]
@@ -846,17 +837,17 @@ def processPacket():
 				addSound('compass', preYaw)
 			print_Speak(speakingCompass, curDir)
 	curSpeed = speedConvert(unpacked_data[61])
-	if curSpeed != preSpeed and abs(curSpeed-preSpeed) >= speedSense:
-		preSpeed=curSpeed
-		if curSpeed > preSpeed:
-			curSpeedInt = curSpeedInt+1
-			if speedMon == True:
-				addSound('speed')
-		else:
-			curSpeedInt = curSpeedInt-1
-			if speedMon == True:
-				addSound('speed')
-		if speedInterval == 0 or curSpeedInt % speedInterval == 0:
+	diff = curSpeed - preSpeed
+	if abs(diff) >= speedSense:
+		old_speed = preSpeed
+		preSpeed = curSpeed
+		if curSpeed > old_speed:
+			curSpeedInt = curSpeedInt + 1
+		elif curSpeed < old_speed:
+			curSpeedInt = curSpeedInt - 1
+		if speedMon == True:
+			addSound('speed')
+		if speedInterval == 0 or (speedInterval > 0 and curSpeedInt % speedInterval == 0):
 			print_Speak(speakingSpeed, tr("tts.speed_value", speed=int(curSpeed), unit=metricString))
 
 def shutDown():
@@ -872,10 +863,10 @@ def shutDown():
 
 mainThread = threading.Thread(target=mainStart)
 packetThread = threading.Thread(target=packetReceiver)
-button_states, value_variables, audio_compass_selection, language_preference = load_configuration()
+button_states, settings_from_config, audio_compass_selection, language_preference = load_configuration()
 language_preference = language_preference if language_preference in SUPPORTED_LANGUAGES else detect_system_language()
 load_translations(language_preference)
-configuration_values = value_variables.copy()
+configuration_values = settings_from_config.copy()
 speedInterval = configuration_values.get("setting.speed.interval", speedInterval)
 speedSense = configuration_values.get("setting.speed.sensitivity", speedSense)
 elevationSense = configuration_values.get("setting.elevation.sensitivity", elevationSense)
